@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: 234438862191.dkr.ecr.ap-south-1.amazonaws.com/shopfast-api
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP
