@@ -44,9 +44,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      # ADD THIS NEW STEP: Configure AWS credentials for OIDC role assumption
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ secrets.AWS_REGION }}
+      # NOW ECR LOGIN WITHOUT ROLE INPUT (it uses the credentials from above)
       - uses: aws-actions/amazon-ecr-login@v2
         with:
-          role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          mask-password: true
+          registry-type: private
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -74,9 +82,9 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsTerraformRole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsTerraformRole
           aws-region: ${{ secrets.AWS_REGION }}
-      - run: terraform init -backend-config="bucket=shopfast-terraform-state-$(aws sts get-caller-identity --query Account --output text)"
+      - run: terraform init -backend-config="bucket=shopfast-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}"
       - run: terraform apply -auto-approve
 
   deploy-eks:
@@ -87,7 +95,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
           aws-region: ${{ secrets.AWS_REGION }}
       - run: aws eks update-kubeconfig --name shopfast-cluster --region ${{ secrets.AWS_REGION }}
       - run: helm upgrade --install shopfast ./helm-chart --set image.tag=sha-${{ github.sha }} -n production --create-namespace
