@@ -1,0 +1,19 @@
+replicaCount: 2
+
+image:
+  repository: 234438862191.dkr.ecr.ap-south-1.amazonaws.com/shopfast-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: alb
+  hosts:
+    - host: shopfast.coolhead.in
+      paths:
+        - path: /
+          pathType: Prefix
