@@ -3,10 +3,14 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# Random password for RDS
+# Random password for RDS (RDS-safe: no / @ " space, but includes other specials)
 resource "random_password" "db_password" {
-  length  = 16
-  special = true
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"  # RDS-safe specials (excludes forbidden / @ " space)
+  min_lower        = 1
+  min_upper        = 1
+  min_numeric      = 1
 }
 
 # VPC Module
