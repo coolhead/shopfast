@@ -13,5 +13,5 @@ boto3==1.35.24
 # DevSecOps tools (only needed in CI, not in production image)
 ruff==0.6.9
 bandit==1.7.9
-safety==3.2.9
+safety==2.3.5
 pytest==8.3.3
