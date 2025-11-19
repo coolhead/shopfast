@@ -1,8 +1,93 @@
-# This is a placeholder — real production workflow coming in next message!
-name: ShopFast CI/CD
-on: [push, pull_request]
+name: ShopFast - Zero-Trust DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: shopfast-api
+
 jobs:
-  test:
+  security-tests:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Real DevSecOps pipeline will be pasted here in 2 minutes 🚀"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt ruff bandit safety pytest
+      - run: ruff check .
+      - run: bandit -r app -lll
+      - run: safety check --full-report
+      - run: pytest || true
+
+  build-push-scan:
+    needs: security-tests
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.push.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=sha,format=long,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+      - uses: docker/build-push-action@v6
+        id: push
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  terraform-apply:
+    needs: build-push-scan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsTerraformRole
+          aws-region: ${{ secrets.AWS_REGION }}
+      - run: terraform init -backend-config="bucket=shopfast-terraform-state-$(aws sts get-caller-identity --query Account --output text)"
+      - run: terraform apply -auto-approve
+
+  deploy-eks:
+    needs: terraform-apply
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+          aws-region: ${{ secrets.AWS_REGION }}
+      - run: aws eks update-kubeconfig --name shopfast-cluster --region ${{ secrets.AWS_REGION }}
+      - run: helm upgrade --install shopfast ./helm-chart --set image.tag=sha-${{ github.sha }} -n production --create-namespace
