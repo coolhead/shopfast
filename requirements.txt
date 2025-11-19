@@ -1,18 +1,17 @@
-# Core app (upgrade FastAPI to latest – it pulls fixed Starlette automatically)
-fastapi>=0.115.2           # latest 0.115.x pulls starlette 0.41+ which fixes both vulns
+fastapi>=0.115.2
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
 pydantic-settings==2.5.2
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 alembic==1.13.3
-python-jose[cryptography]>=3.4.0   # fixes both python-jose vulns
+python-jose[cryptography]>=3.4.0
 passlib[bcrypt]==1.7.4
-python-multipart>=0.0.19           # fixes the multipart DoS (0.0.19+ is safe)
+python-multipart>=0.0.19
 redis==5.0.8
 boto3==1.35.24
 
-# DevSecOps tools (CI only)
+# CI tools
 ruff==0.6.9
 bandit==1.7.9
 safety==2.3.5
