@@ -5,20 +5,18 @@ pydantic-settings==2.5.2
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 alembic==1.13.3
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]>=3.4.0   # ← upgraded, fixes 2 vulns
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.10
+python-multipart>=0.0.18           # ← upgraded, fixes DoS vuln
 redis==5.0.8
 boto3==1.35.24
 
-# DevSecOps tools
+# DevSecOps tools (CI only)
 ruff==0.6.9
 bandit==1.7.9
 safety==2.3.5
 pytest==8.3.3
 
-# Explicitly upgrade vulnerable transitive deps to safe versions
-starlette>=0.40.0   # fixes both starlette vulns
-python-jose[cryptography]>=3.4.0  # fixes both python-jose vulns
-python-multipart>=0.0.18         # fixes DoS vuln
-ecdsa>=0.19.0                    # no fix exists, but we don't use ECDSA directly
+# Force safe transitive deps
+starlette>=0.40.0   # fixes both Starlette vulns
+ecdsa>=0.19.0       # side-channel only, safe to ignore for demo
