@@ -1,0 +1,52 @@
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "shopfast.fullname" . }}
+  labels:
+    {{- include "shopfast.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "shopfast.fullname" . }}
+
+  minReplicas: {{ .Values.hpa.minReplicas | default 2 }}
+  maxReplicas: {{ .Values.hpa.maxReplicas | default 10 }}
+
+  # Smooth scaling behavior: quick up, conservative down
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+  # ---- Option 1: CPU Utilization (percentage of requests) ----
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.cpuUtilization | default 60 }}
+
+  # ---- Option 2 (alternative): Absolute CPU target (AverageValue) ----
+  # To use this instead of Utilization above, comment out the block above and
+  # uncomment the block below. Also set .Values.hpa.averageCpuValue (e.g., "120m")
+  #
+  # metrics:
+  #   - type: Resource
+  #     resource:
+  #       name: cpu
+  #       target:
+  #         type: AverageValue
+  #         averageValue: {{ .Values.hpa.averageCpuValue | default "120m" | quote }}
+{{- end }}

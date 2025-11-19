@@ -1,25 +1,62 @@
-replicaCount: 2
-
+# -------- Image ----------
 image:
   repository: 234438862191.dkr.ecr.ap-south-1.amazonaws.com/shopfast-api
   tag: latest
   pullPolicy: Always
 
-service:
-  type: ClusterIP
-  port: 8000
+# -------- App runtime ----
+replicaCount: 2
+containerPort: 8000
 
+app:
+  workers: 4
+  logLevel: info
+
+# -------- Probes ----------
+probes:
+  readinessPath: /healthz
+  livenessPath: /healthz
+
+# -------- Service ---------
+service:
+  type: LoadBalancer
+  port: 80
+
+# -------- Resources -------
+# Tip: if you want HPA to trigger more easily, keep cpu "requests" modest.
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# -------- Ingress ---------
+# Leave disabled unless you’ve got AWS Load Balancer Controller + ACM ready.
 ingress:
-  enabled: true
+  enabled: false
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: "" # leave empty for HTTP only (or add ACM cert ARN for HTTPS)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:<ACCOUNT_ID>:certificate/<ACM_ID>
   hosts:
-    - host: "" # leave empty for random ALB DNS
+    - host: api.shopfast.coolhead.dev
       paths:
         - path: /
           pathType: Prefix
+  tls: true
+
+# -------- HPA -------------
+# behavior: fast scale-up, slower scale-down
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpuUtilization: 60        # % of requested CPU (60% of 100m = ~60m avg)
+  # If you prefer absolute CPU instead of %, set this and switch the template metric
+  averageCpuValue: "120m"   # optional; used only if you flip hpa metric to AverageValue

@@ -1,3 +1,26 @@
+{{- /* ---------- locals ---------- */ -}}
+{{- $containerPort := (default 8000 .Values.containerPort) -}}
+{{- $workers := 2 -}}
+{{- with .Values.app }}{{- if hasKey . "workers" }}{{- $workers = .workers }}{{- end }}{{- end -}}
+{{- $logLevel := "info" -}}
+{{- with .Values.app }}{{- if hasKey . "logLevel" }}{{- $logLevel = .logLevel }}{{- end }}{{- end -}}
+{{- $readinessPath := "/healthz" -}}
+{{- with .Values.probes }}{{- if hasKey . "readinessPath" }}{{- $readinessPath = .readinessPath }}{{- end }}{{- end -}}
+{{- $livenessPath := "/healthz" -}}
+{{- with .Values.probes }}{{- if hasKey . "livenessPath" }}{{- $livenessPath = .livenessPath }}{{- end }}{{- end -}}
+{{- $reqCpu := "200m" -}}{{- $reqMem := "256Mi" -}}{{- $limCpu := "500m" -}}{{- $limMem := "512Mi" -}}
+{{- with .Values.resources }}
+  {{- with .requests }}
+    {{- if .cpu    }}{{- $reqCpu = .cpu    }}{{- end -}}
+    {{- if .memory }}{{- $reqMem = .memory }}{{- end -}}
+  {{- end -}}
+  {{- with .limits }}
+    {{- if .cpu    }}{{- $limCpu = .cpu    }}{{- end -}}
+    {{- if .memory }}{{- $limMem = .memory }}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* ---------- end locals ---------- */ -}}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,51 +28,107 @@ metadata:
   labels:
     {{- include "shopfast.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.replicaCount | default 2 }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       {{- include "shopfast.selectorLabels" . | nindent 6 }}
+      # do NOT add new keys; selector is immutable
   template:
     metadata:
       labels:
         {{- include "shopfast.selectorLabels" . | nindent 8 }}
+        app: {{ include "shopfast.name" . }}  # Service selects this
     spec:
+      # pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # <-- THIS belongs at spec.template.spec level (Option B)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+{{ include "shopfast.selectorLabels" . | indent 14 }}
+              app: {{ include "shopfast.name" . }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+{{ include "shopfast.selectorLabels" . | indent 14 }}
+              app: {{ include "shopfast.name" . }}
+
       containers:
         - name: shopfast
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+
           ports:
-            - containerPort: 8000
-          command:
-            - uvicorn
+            - name: http
+              containerPort: {{ $containerPort }}
+              protocol: TCP
+
+          command: ["uvicorn"]
           args:
             - "app.main:app"
             - "--host"
             - "0.0.0.0"
             - "--port"
-            - "8000"
+            - "{{ $containerPort }}"
             - "--workers"
-            - "4"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
+            - "{{ $workers }}"
+
+          env:
+            - name: LOG_LEVEL
+              value: {{ $logLevel | quote }}
+
           readinessProbe:
             httpGet:
-              path: /
-              port: 8000
+              path: {{ $readinessPath | quote }}
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: {{ $livenessPath | quote }}
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           resources:
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
             requests:
-              cpu: "200m"
-              memory: "256Mi"
+              cpu: {{ $reqCpu | quote }}
+              memory: {{ $reqMem | quote }}
+            limits:
+              cpu: {{ $limCpu | quote }}
+              memory: {{ $limMem | quote }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
