@@ -1,0 +1,8 @@
+# This is a placeholder — real production workflow coming in next message!
+name: ShopFast CI/CD
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Real DevSecOps pipeline will be pasted here in 2 minutes 🚀"
