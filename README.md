@@ -38,7 +38,7 @@ kubectl get svc shopfast -n production
 **Root endpoint response**  
 ```json
 {"message":"ShopFast API is LIVE on AWS EKS! Built by coolhead "}
-
+```
 
 ## Features
 
@@ -54,7 +54,7 @@ kubectl get svc shopfast -n production
 - Ready for HTTPS, PostgreSQL, Redis, JWT auth, monitoring, etc.
 
 ## Architecture Overview
-
+```
 GitHub Repo ──(push)──► GitHub Actions (OIDC)
                              │
                              ▼
@@ -72,9 +72,7 @@ GitHub Repo ──(push)──► GitHub Actions (OIDC)
                              ▼
                         Your browser / Postman / mobile app
 
-
-
-
+```
 ### GitHub → (OIDC) GitHub Actions → Build & Push Docker Image → ECR → Helm Upgrade → EKS Pods → LoadBalancer Service → Public Internet
 
 ### Screenshots
@@ -83,7 +81,7 @@ GitHub Repo ──(push)──► GitHub Actions (OIDC)
 
 
 ### Tech Stack
-```
+
  __________________________________________________________________
 | Layer          | Technology                                      |
 |----------------|-------------------------------------------------|
@@ -98,10 +96,9 @@ GitHub Repo ──(push)──► GitHub Actions (OIDC)
 |__________________________________________________________________|
 
 ### Local Development
-```bash
-#### Run the API locally:
 
-#### Create virtualenv (optional)
+#### Run the API locally:
+Create virtualenv (optional)
 python3 -m venv .venv
 source .venv/bin/activate
 
@@ -201,7 +198,7 @@ shopfast/
 ├── Dockerfile                # multi-stage build for FastAPI
 ├── requirements.txt
 └── README.md
-
+```
 
 
 
