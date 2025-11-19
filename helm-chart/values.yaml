@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 234438862191.dkr.ecr.ap-south-1.amazonaws.com/shopfast-api
-  tag: "latest"
+  tag: latest
   pullPolicy: IfNotPresent
 
 service:
@@ -12,8 +12,14 @@ service:
 ingress:
   enabled: true
   className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "" # leave empty for HTTP only (or add ACM cert ARN for HTTPS)
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
   hosts:
-    - host: shopfast.coolhead.in
+    - host: "" # leave empty for random ALB DNS
       paths:
         - path: /
           pathType: Prefix
